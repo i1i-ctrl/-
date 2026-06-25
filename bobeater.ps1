@@ -1,19 +1,33 @@
-function Set-HtmlTitle {
+function Set-AllHtmlTitles {
     param (
         [Parameter(Mandatory=$true)]
-        [string]$FilePath,
+        [string]$FolderPath,
         
         [Parameter(Mandatory=$true)]
         [string]$NewTitle
     )
 
-    if (Test-Path $FilePath) {
-        (Get-Content -Path $FilePath) -replace '(?i)<title>.*?</title>', "<title>$NewTitle</title>" | Set-Content -Path $FilePath
-        Write-Host "Success! Title changed to '$NewTitle' in $FilePath" -ForegroundColor Green
-    } else {
-        Write-Host "Error: Could not find the file at $FilePath" -ForegroundColor Red
-    }
-}
+    # 1. Find all HTML files in the folder AND all subfolders
+    # -ErrorAction SilentlyContinue prevents it from spamming red errors if it hits a locked folder
+    $htmlFiles = Get-ChildItem -Path $FolderPath -Filter "*.html" -Recurse -File -ErrorAction SilentlyContinue
 
-Write-Host "The 'Set-HtmlTitle' tool is now loaded in memory!" -ForegroundColor Cyan
-Write-Host "To use it, type: Set-HtmlTitle -FilePath 'C:\your\file.html' -NewTitle 'bobo'" -ForegroundColor Yellow
+    # 2. Check if we actually found anything
+    if ($htmlFiles.Count -eq 0) {
+        Write-Host "No HTML files found in $FolderPath or its subfolders." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "Found $($htmlFiles.Count) HTML files. Starting the upgrade..." -ForegroundColor Cyan
+
+    # 3. Loop through every single file it found and change the title
+    foreach ($file in $htmlFiles) {
+        try {
+            (Get-Content -Path $file.FullName) -replace '(?i)<title>.*?</title>', "<title>$NewTitle</title>" | Set-Content -Path $file.FullName
+            Write-Host " [SUCCESS] Updated: $($file.FullName)" -ForegroundColor Green
+        } catch {
+            Write-Host " [ERROR] Could not update: $($file.FullName)" -ForegroundColor Red
+        }
+    }
+    
+    Write-Host "Finished updating all files!" -ForegroundColor Cyan
+}
